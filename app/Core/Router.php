@@ -91,7 +91,8 @@ class Router
         $parameters = [];
 
         foreach ($this->routes as $route) {
-            if ($route['method'] !== $method) {
+            $isMatchingMethod = ($route['method'] === $method) || ($method === 'HEAD' && $route['method'] === 'GET');
+            if (!$isMatchingMethod) {
                 continue;
             }
 
