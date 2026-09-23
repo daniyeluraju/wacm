@@ -322,12 +322,24 @@ class WhatsAppCloudApiService
             ]);
         }
 
+        $overallSuccess = ($sentCount > 0) || (empty($pendingRecipients));
+        $firstError = null;
+        if (!$overallSuccess && $failedCount > 0) {
+            foreach ($results as $r) {
+                if (!empty($r['error'])) {
+                    $firstError = $r['error'];
+                    break;
+                }
+            }
+        }
+
         return [
-            'success' => true,
+            'success' => $overallSuccess,
             'sent_count' => $sentCount,
             'failed_count' => $failedCount,
             'remaining_count' => $remainingCount,
             'completed' => $isCompleted,
+            'error' => $firstError,
             'results' => $results,
         ];
     }

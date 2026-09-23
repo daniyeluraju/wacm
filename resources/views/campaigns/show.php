@@ -13,15 +13,27 @@
             <?php endif; ?>
         </p>
     </div>
-    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
         <?php if ($stats['pending'] > 0 || $stats['chat_opened'] > 0):
             $pendingCount = $stats['pending'] + $stats['chat_opened'];
         ?>
+            <!-- Live Gateway Status Indicator -->
+            <div id="gatewayStatusBadge" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.85rem; border-radius: var(--radius-md); font-size: 0.8rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); color: var(--text-secondary);">
+                <span class="status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
+                <span id="gatewayStatusText">Checking Gateway...</span>
+            </div>
+
             <!-- Direct Automated Broadcast Button -->
             <button type="button" id="btnDirectSend" onclick="triggerDirectSend()" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); font-weight: 700; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);">
                 <svg style="width: 18px; height: 18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                ⚡ Start Direct Automated Send <?= !empty($draft->has_attachment) ? '(with Image)' : '' ?> (<?= $pendingCount ?> Pending)
+                <span id="btnDirectSendText">⚡ Start Direct Automated Send <?= !empty($draft->has_attachment) ? '(with Image)' : '' ?> (<?= $pendingCount ?> Pending)</span>
             </button>
+
+            <!-- Hidden Fallback Form for Direct Submission -->
+            <form id="directSendFallbackForm" method="POST" action="/campaigns/<?= (int)$campaign->id ?>/direct-send" style="display:none;">
+                <?= csrf_field() ?>
+            </form>
+
             <!-- Refresh Messages Button -->
             <form method="POST" action="/campaigns/<?= e($campaign->id) ?>/refresh-messages" style="display:inline;"
                   onsubmit="return confirm('Re-generate messages from latest draft?\n\nThis will update <?= $pendingCount ?> pending recipient message(s) with the current draft content.\nUse this after editing the draft (e.g. adding a link).')">
@@ -173,45 +185,131 @@
 </div>
 
 <script>
+let isGatewayConnected = false;
+
+// Check live WhatsApp gateway status on page load
+async function checkGatewayStatus() {
+    const badge = document.getElementById('gatewayStatusBadge');
+    const text = document.getElementById('gatewayStatusText');
+    const dot = badge ? badge.querySelector('.status-dot') : null;
+
+    try {
+        const res = await fetch('/gateway/status', {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (data && data.status === 'connected') {
+            isGatewayConnected = true;
+            if (dot) dot.style.background = '#10b981';
+            const userPhone = data.user?.id ? (' (+' + data.user.id.split(':')[0].replace(/\D/g, '') + ')') : '';
+            if (text) text.innerHTML = '<span style="color: #34d399; font-weight: 600;">● Gateway Ready' + userPhone + '</span>';
+            if (badge) {
+                badge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                badge.style.background = 'rgba(16, 185, 129, 0.08)';
+            }
+        } else {
+            isGatewayConnected = false;
+            if (dot) dot.style.background = '#f59e0b';
+            if (text) text.innerHTML = '<a href="/gateway" style="color: #fbbf24; text-decoration: underline; font-weight: 600;">⚠️ Device Not Linked (Link QR)</a>';
+            if (badge) {
+                badge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+                badge.style.background = 'rgba(245, 158, 11, 0.08)';
+            }
+        }
+    } catch (e) {
+        if (text) text.innerText = 'Gateway Status Unknown';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', checkGatewayStatus);
+
 function triggerDirectSend() {
-    if (!confirm('Are you sure you want to start Direct Automated Sending for all pending recipients in this campaign?')) {
+    if (!isGatewayConnected) {
+        if (confirm('WhatsApp Device does not appear to be linked yet.\n\nWould you like to open the WhatsApp QR Gateway page to link your phone now?')) {
+            window.location.href = '/gateway';
+            return;
+        }
+    }
+
+    if (!confirm('Start Direct Automated Sending for all pending recipients in this campaign now?')) {
         return;
     }
 
     const btn = document.getElementById('btnDirectSend');
+    const btnText = document.getElementById('btnDirectSendText');
     const banner = document.getElementById('directSendBanner');
     const statusText = document.getElementById('directSendStatusText');
     const bar = document.getElementById('directSendProgressBar');
     const percentBadge = document.getElementById('directSendPercent');
+    const fallbackForm = document.getElementById('directSendFallbackForm');
 
     if (btn) btn.disabled = true;
+    if (btnText) btnText.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin-right:6px;vertical-align:middle;"></span> Dispatching to WhatsApp...';
     if (banner) banner.style.display = 'block';
-    if (bar) bar.style.width = '30%';
+    if (bar) bar.style.width = '35%';
+    if (statusText) statusText.innerText = 'Dispatching messages via Direct Automated Gateway...';
+    if (percentBadge) {
+        percentBadge.className = 'badge badge-warning';
+        percentBadge.innerText = 'Sending...';
+    }
 
-    statusText.innerText = 'Dispatching messages via Direct Automated Gateway...';
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
-    window.apiFetch('/campaigns/<?= (int)$campaign->id ?>/direct-send', {
-        method: 'POST'
+    fetch('/campaigns/<?= (int)$campaign->id ?>/direct-send', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken
+        },
+        body: JSON.stringify({
+            _csrf_token: csrfToken
+        })
     }).then(async response => {
-        if (!response) return;
-        const res = await response.json();
+        const res = await response.json().catch(() => ({}));
         if (bar) bar.style.width = '100%';
-        if (res && res.success) {
-            statusText.innerText = 'Success! ' + res.sent_count + ' message(s) delivered. Reloading...';
-            percentBadge.className = 'badge badge-success';
-            percentBadge.innerText = 'Completed';
+
+        if (response.ok && res && res.success && (res.sent_count > 0 || res.completed)) {
+            if (statusText) statusText.innerText = 'Success! ' + res.sent_count + ' message(s) delivered. Reloading...';
+            if (percentBadge) {
+                percentBadge.className = 'badge badge-success';
+                percentBadge.innerText = 'Completed';
+            }
+            if (window.Toast) window.Toast.show('success', 'Direct automated dispatch complete! ' + res.sent_count + ' message(s) delivered.');
             setTimeout(() => {
                 window.location.reload();
             }, 1000);
         } else {
-            statusText.innerText = 'Error: ' + ((res && res.error) || 'Failed to dispatch');
-            percentBadge.className = 'badge badge-danger';
-            percentBadge.innerText = 'Failed';
-            if (btn) btn.disabled = false;
+            const errorMsg = (res && res.error) || (res && res.message) || 'Failed to dispatch messages.';
+            if (statusText) statusText.innerText = 'Error: ' + errorMsg;
+            if (percentBadge) {
+                percentBadge.className = 'badge badge-danger';
+                percentBadge.innerText = 'Failed';
+            }
+            if (window.Toast) window.Toast.show('error', errorMsg);
+            if (btn) {
+                btn.disabled = false;
+                if (btnText) btnText.innerHTML = '⚡ Retry Direct Automated Send';
+            }
+
+            // If user wants to try standard server form submission as fallback
+            if (confirm('Direct automated dispatch encountered an error:\n\n' + errorMsg + '\n\nTry fallback direct server dispatch?')) {
+                if (fallbackForm) fallbackForm.submit();
+            }
         }
     }).catch(err => {
-        statusText.innerText = 'Network Error: ' + err.message;
-        if (btn) btn.disabled = false;
+        const errorMsg = err.message || 'Network connection failed.';
+        if (statusText) statusText.innerText = 'Network Error: ' + errorMsg;
+        if (btn) {
+            btn.disabled = false;
+            if (btnText) btnText.innerHTML = '⚡ Retry Direct Automated Send';
+        }
+        if (window.Toast) window.Toast.show('error', 'Network error: ' + errorMsg);
+        if (confirm('Network error during request: ' + errorMsg + '\n\nSubmit via fallback form?')) {
+            if (fallbackForm) fallbackForm.submit();
+        }
     });
 }
 </script>
