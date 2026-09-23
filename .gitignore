@@ -1,0 +1,35 @@
+# PHP
+/vendor/
+composer.phar
+.phpunit.result.cache
+
+# Environment — NEVER commit secrets
+.env
+.env.backup
+.env.local
+.env.*.local
+
+# Storage — runtime files only, keep folder structure
+/storage/logs/*.log
+/storage/temporary/*
+/storage/exports/*
+/storage/uploads/*
+!/storage/logs/.gitkeep
+!/storage/temporary/.gitkeep
+!/storage/exports/.gitkeep
+!/storage/uploads/.gitkeep
+
+# Gateway — Node.js
+/gateway/node_modules/
+/gateway/package-lock.json
+
+# Gateway — WhatsApp session (SENSITIVE — contains auth keys)
+/gateway/auth_info_baileys/
+
+# OS & IDE junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
