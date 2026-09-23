@@ -1,9 +1,15 @@
 #!/bin/bash
 set -e
 
-# Support cloud platform dynamic PORT (Railway / Render / Fly.io / Heroku)
-PORT=${PORT:-80}
-sed -i "s/80/${PORT}/g" /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf
+PORT="${PORT:-80}"
+echo "===> Configuring Apache to listen on port ${PORT}..."
+sed -i "s/Listen [0-9]\+/Listen ${PORT}/" /etc/apache2/ports.conf
+sed -i "s/<VirtualHost \*:[0-9]\+>/<VirtualHost \*:${PORT}>/" /etc/apache2/sites-available/000-default.conf
+
+# Clean up any duplicate MPMs in mods-enabled — enforce single mpm_prefork
+rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf
+ln -sf /etc/apache2/mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load
+ln -sf /etc/apache2/mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf
 
 # Setup Apache environment variables and runtime directories
 [ -f /etc/apache2/envvars ] && . /etc/apache2/envvars
