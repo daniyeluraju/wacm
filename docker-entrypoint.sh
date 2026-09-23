@@ -5,6 +5,11 @@ set -e
 PORT=${PORT:-80}
 sed -i "s/80/${PORT}/g" /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf
 
+# Setup Apache environment variables and runtime directories
+[ -f /etc/apache2/envvars ] && . /etc/apache2/envvars
+mkdir -p /var/run/apache2 /var/lock/apache2 /var/log/apache2
+rm -f /var/run/apache2/apache2.pid
+
 # Create necessary storage directories and permissions
 mkdir -p /var/www/html/storage/logs \
          /var/www/html/storage/temporary \

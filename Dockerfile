@@ -28,8 +28,9 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         bcmath \
         gd
 
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
+# Enable Apache mod_rewrite and ensure single MPM (prefork for PHP)
+RUN a2dismod mpm_event mpm_worker 2>/dev/null || true \
+    && a2enmod mpm_prefork rewrite
 
 # Configure Apache DocumentRoot to point to /var/www/html/public
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
