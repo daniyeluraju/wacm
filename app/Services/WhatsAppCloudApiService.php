@@ -161,8 +161,9 @@ class WhatsAppCloudApiService
                 }
             }
 
-            // Local WhatsApp QR Gateway (Port 3001)
-            $url = "http://127.0.0.1:3001/send";
+            // Local / Cloud WhatsApp QR Gateway
+            $gatewayBase = env('GATEWAY_URL', 'http://127.0.0.1:3001');
+            $url = rtrim($gatewayBase, '/') . '/send';
             $payload = [
                 'phone' => $phoneDigits,
                 'message' => $messageBody,

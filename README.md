@@ -138,3 +138,33 @@ Access via: [http://localhost/wacm/public](http://localhost/wacm/public)
 | **Super Admin** | `admin@wacm.local` | `Admin@123456` |
 | **Admin** | `manager@wacm.local` | `Admin@123456` |
 | **Viewer** | `viewer@wacm.local` | `Viewer@123456` |
+
+---
+
+## 🚀 Cloud Deployment (Deploy Online)
+
+### Option 1: Railway (Recommended — 1-Click Full-Stack)
+Railway easily hosts the complete stack (PHP App + WhatsApp Gateway Daemon + MySQL database):
+
+1. Go to [railway.app](https://railway.app) and sign in with GitHub.
+2. Click **New Project** → **Deploy from GitHub repo** → select `wacm`.
+3. Click **Add Service** → **Database** → **Add MySQL**.
+4. In your `wacm` service settings:
+   - Click **Generate Domain** (gives you a live public HTTPS URL).
+   - Variables are automatically linked via `MYSQL_URL` / `DATABASE_URL`.
+5. Railway builds the `Dockerfile`, auto-runs database migrations, and launches both PHP and the WhatsApp gateway!
+
+### Option 2: Render.com
+1. Go to [render.com](https://render.com) and sign in with GitHub.
+2. Click **New +** → **Blueprint** → select your `wacm` repository.
+3. Attach a MySQL database (e.g., from [Aiven](https://aiven.io) or [Clever Cloud](https://www.clever-cloud.com)) and set `DATABASE_URL`.
+4. Deploy!
+
+### Option 3: Docker & Docker Compose (Any Server or VPS)
+Run the full stack (PHP, Node.js WhatsApp Gateway, and MySQL 8) locally or on any Linux server:
+
+```bash
+docker compose up -d --build
+```
+Access the application at [http://localhost:8000](http://localhost:8000).
+

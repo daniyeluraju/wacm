@@ -13,11 +13,23 @@ require_once dirname(__DIR__) . '/app/Helpers/functions.php';
 require_once dirname(__DIR__) . '/app/Core/Env.php';
 \App\Core\Env::load(dirname(__DIR__) . '/.env');
 
-$dbHost = env('DB_HOST', '127.0.0.1');
-$dbPort = env('DB_PORT', '3306');
-$dbName = env('DB_DATABASE', 'wacm');
-$dbUser = env('DB_USERNAME', 'root');
-$dbPass = env('DB_PASSWORD', '');
+$dbUrl = env('DATABASE_URL', env('MYSQL_URL'));
+if ($dbUrl) {
+    $parsed = parse_url($dbUrl);
+    if ($parsed) {
+        $dbHost = $parsed['host'] ?? '127.0.0.1';
+        $dbPort = $parsed['port'] ?? 3306;
+        $dbName = !empty($parsed['path']) ? ltrim($parsed['path'], '/') : 'wacm';
+        $dbUser = $parsed['user'] ?? 'root';
+        $dbPass = $parsed['pass'] ?? '';
+    }
+} else {
+    $dbHost = env('DB_HOST', '127.0.0.1');
+    $dbPort = env('DB_PORT', '3306');
+    $dbName = env('DB_DATABASE', 'wacm');
+    $dbUser = env('DB_USERNAME', 'root');
+    $dbPass = env('DB_PASSWORD', '');
+}
 $dbCharset = env('DB_CHARSET', 'utf8mb4');
 
 echo "=======================================================\n";
@@ -25,28 +37,41 @@ echo "  WACM - Database Migration & Setup Tool\n";
 echo "=======================================================\n\n";
 
 try {
-    // 1. Connect to MySQL server without database specified
-    $rootPdo = new PDO(
-        "mysql:host={$dbHost};port={$dbPort};charset={$dbCharset}",
-        $dbUser,
-        $dbPass,
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
+    // 1. Try connecting directly to the target database first
+    $pdo = null;
+    try {
+        $pdo = new PDO(
+            "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbCharset}",
+            $dbUser,
+            $dbPass,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ]
+        );
+        echo "[1/4] Connected directly to database `{$dbName}`.\n\n";
+    } catch (PDOException $ex) {
+        // If connecting to specific db failed, try connecting without db name and create it
+        echo "[1/4] Attempting to create database `{$dbName}`...\n";
+        $rootPdo = new PDO(
+            "mysql:host={$dbHost};port={$dbPort};charset={$dbCharset}",
+            $dbUser,
+            $dbPass,
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+        );
+        $rootPdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        echo "      Database `{$dbName}` is ready.\n\n";
 
-    echo "[1/4] Ensuring database `{$dbName}` exists...\n";
-    $rootPdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    echo "      Database `{$dbName}` is ready.\n\n";
-
-    // 2. Connect to the specific database
-    $pdo = new PDO(
-        "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbCharset}",
-        $dbUser,
-        $dbPass,
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_EMULATE_PREPARES => false,
-        ]
-    );
+        $pdo = new PDO(
+            "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbCharset}",
+            $dbUser,
+            $dbPass,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ]
+        );
+    }
 
     // 3. Run Migrations
     echo "[2/4] Running schema migrations from database/migrations/...\n";

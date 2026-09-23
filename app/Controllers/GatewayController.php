@@ -7,7 +7,12 @@ use App\Core\Response;
 
 class GatewayController extends BaseController
 {
-    private string $gatewayUrl = 'http://127.0.0.1:3001';
+    private string $gatewayUrl;
+
+    public function __construct()
+    {
+        $this->gatewayUrl = env('GATEWAY_URL', 'http://127.0.0.1:3001');
+    }
 
     public function index(Request $request): Response
     {

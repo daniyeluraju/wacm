@@ -1,16 +1,34 @@
 <?php
 
+$dbUrl = env('DATABASE_URL', env('MYSQL_URL'));
+$urlHost = null;
+$urlPort = null;
+$urlDatabase = null;
+$urlUser = null;
+$urlPass = null;
+
+if ($dbUrl) {
+    $parsed = parse_url($dbUrl);
+    if ($parsed) {
+        $urlHost = $parsed['host'] ?? null;
+        $urlPort = $parsed['port'] ?? null;
+        $urlDatabase = !empty($parsed['path']) ? ltrim($parsed['path'], '/') : null;
+        $urlUser = $parsed['user'] ?? null;
+        $urlPass = $parsed['pass'] ?? null;
+    }
+}
+
 return [
     'default' => 'mysql',
     
     'connections' => [
         'mysql' => [
             'driver' => 'mysql',
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'wacm'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
+            'host' => $urlHost ?? env('DB_HOST', '127.0.0.1'),
+            'port' => $urlPort ?? env('DB_PORT', '3306'),
+            'database' => $urlDatabase ?? env('DB_DATABASE', 'wacm'),
+            'username' => $urlUser ?? env('DB_USERNAME', 'root'),
+            'password' => $urlPass ?? env('DB_PASSWORD', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
             'collation' => 'utf8mb4_unicode_ci',
             'options' => [
