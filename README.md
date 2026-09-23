@@ -167,4 +167,5 @@ Run the full stack (PHP, Node.js WhatsApp Gateway, and MySQL 8) locally or on an
 docker compose up -d --build
 ```
 Access the application at [http://localhost:8000](http://localhost:8000).
+**Developed By Daniyeluraju Nalaamekala**
 
